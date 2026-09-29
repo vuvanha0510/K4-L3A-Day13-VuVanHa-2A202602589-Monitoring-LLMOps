@@ -106,8 +106,38 @@ def _series_from(pairs: list[tuple[str, float]]) -> list[tuple[str, float]]:
     return [(name, value) for name, value in pairs if value]
 
 
+def _series_keep_zero(pairs: list[tuple[str, float]]) -> list[tuple[str, float]]:
+    """Giữ cả giá trị 0.
+
+    Panel `errors` cần hiện cả những phút không có lỗi, nếu không sẽ không có
+    dòng series nào và panel trông như bị lỗi khi hệ thống đang ổn.
+    """
+    return list(pairs)
+
+
 def _fmt(value: float) -> str:
     return str(int(value)) if value == int(value) else f"{value:.4g}"
+
+
+def _threshold_state(panel: dict[str, Any], metrics: dict[str, float]) -> tuple[bool | None, str]:
+    """Đánh giá threshold của panel: (có vi phạm hay không, chuỗi hiển thị).
+
+    Trả `None` khi không xác định được giá trị metric (thiếu dữ liệu) để phân
+    biệt "đạt" với "không đo được" trong ảnh evidence.
+    """
+    threshold = panel.get("threshold", {})
+    aggregation = str(threshold.get("aggregation"))
+    operator = str(threshold.get("operator"))
+    limit = threshold.get("value")
+    actual = metrics.get(aggregation)
+
+    head = f"Threshold: {aggregation} {operator} {limit} {panel.get('unit')}"
+    if actual is None or not isinstance(limit, (int, float)):
+        return None, f"⚠ {head} (chưa đủ dữ liệu để đánh giá)"
+
+    breached = actual > limit if operator == "lte" else actual < limit
+    mark = "⚠ BREACH" if breached else "✅ OK"
+    return breached, f"{mark} — {head}; measured {aggregation}={_fmt(float(actual))} {panel.get('unit')}"
 
 
 def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
@@ -130,6 +160,7 @@ def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[s
             ],
             "series": [("Latency theo phút", _series_from(_bucket_sum(responses, "latency_ms")))],
             "sample": responses[-1] if responses else None,
+            "metrics": {"p95": percentile(latency, 95), "p50": percentile(latency, 50)},
         }
 
     if panel_id == "traffic":
@@ -144,6 +175,7 @@ def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[s
             ],
             "series": [("Request/phút", counts)],
             "sample": received[-1] if received else None,
+            "metrics": {"rate_per_minute": rate},
         }
 
     if panel_id == "errors":
@@ -154,17 +186,45 @@ def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[s
         tool_events = [e for e in events if e.get("tool_success") is not None]
         tool_ok = [e for e in tool_events if e.get("tool_success") is True]
         retrieval = round(100.0 * len(tool_ok) / len(tool_events), 2) if tool_events else 0.0
+        failed_series = _bucket_count(failed)
+        # Giữ cả phút không có lỗi để panel luôn có series, kể cả khi hệ thống ổn.
+        if failed_series:
+            error_minutes = failed_series
+        elif received:
+            error_minutes = [
+                (minute, 0.0) for minute in sorted({_parse_ts(e.get("ts")).strftime("%H:%M") for e in received})
+            ]
+        else:
+            error_minutes = []
+        breakdown = (
+            [(name, float(count)) for name, count in sorted(by_error.items())]
+            if by_error
+            else [("(không có lỗi trong time range)", 0.0)]
+        )
         return {
             "stats": [
                 ("Error rate", f"{error_rate} %"),
+                ("Số request_received", f"{len(received)}"),
                 ("Số request_failed", f"{len(failed)}"),
+                ("Số lần gọi tool", f"{len(tool_events)}"),
                 ("Retrieval success", f"{retrieval} %"),
             ],
             "series": [
-                ("Error theo phút", _series_from(_bucket_count(failed))),
-                ("Error breakdown", [(name, float(c)) for name, c in sorted(by_error.items())]),
+                ("Error theo phút", _series_keep_zero(error_minutes)),
+                ("Error breakdown", breakdown),
             ],
-            "sample": failed[-1] if failed else (received[-1] if received else None),
+            # Không fallback sang request_received: panel lỗi phải nói rõ là không
+            # có lỗi, không gắn nhầm log của request thành công vào panel errors.
+            "sample": failed[-1] if failed else None,
+            "note": (
+                None
+                if failed
+                else (
+                    f"Không có request_failed trong {len(received)} request của time range "
+                    "→ error rate 0%, hệ thống đang bình thường."
+                )
+            ),
+            "metrics": {"error_rate_pct": error_rate, "tool_success_rate_pct": retrieval},
         }
 
     if panel_id == "cost":
@@ -178,6 +238,7 @@ def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[s
             ],
             "series": [("Cost theo phút (USD)", _series_from(_bucket_sum(responses, "cost_usd")))],
             "sample": responses[-1] if responses else None,
+            "metrics": {"total": round(sum(costs), 6)},
         }
 
     if panel_id == "tokens":
@@ -195,6 +256,7 @@ def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[s
                 ("tokens_out theo phút", _series_from(_bucket_sum(responses, "tokens_out"))),
             ],
             "sample": responses[-1] if responses else None,
+            "metrics": {"sum_by_field": sum(tokens_in) + sum(tokens_out)},
         }
 
     responses = by_event.get("response_sent", [])
@@ -207,6 +269,7 @@ def compute_panel(panel: dict[str, Any], events: list[dict[str, Any]]) -> dict[s
         ],
         "series": [("Quality theo phút", _series_from(_bucket_sum(responses, "quality_score")))],
         "sample": responses[-1] if responses else None,
+        "metrics": {"mean": _mean(quality)},
     }
 
 
@@ -221,6 +284,8 @@ STYLE = (
     "table.stats td{padding:3px 0;border-bottom:1px solid #263449}"
     "table.stats td:last-child{text-align:right;font-weight:600}"
     ".thr{margin-top:8px;font-size:11px;color:#f59e0b}"
+    ".thr.ok{color:#4ade80}"
+    ".note{margin-top:6px;font-size:11px;color:#94a3b8}"
     ".series{margin-top:6px;font-size:11px;color:#7dd3fc;word-break:break-all}"
     "pre{background:#0b1220;padding:8px;font-size:10px;overflow:auto;max-height:130px;color:#94a3b8}"
 )
@@ -229,7 +294,7 @@ STYLE = (
 def render_panel_html(panel: dict[str, Any], events: list[dict[str, Any]]) -> str:
     """Một panel: tên, đơn vị, số liệu, threshold line và series theo phút."""
     rendered = compute_panel(panel, events)
-    threshold = panel.get("threshold", {})
+    breached, threshold_text = _threshold_state(panel, rendered.get("metrics", {}))
 
     rows = "".join(
         f"<tr><td>{html.escape(label)}</td><td>{html.escape(value)}</td></tr>"
@@ -242,14 +307,13 @@ def render_panel_html(panel: dict[str, Any], events: list[dict[str, Any]]) -> st
             series.append(
                 f'<div class="series"><b>{html.escape(series_title)}:</b> {html.escape(body)}</div>'
             )
+    note = ""
+    if rendered.get("note"):
+        note = f'<div class="note">ℹ️ {html.escape(str(rendered["note"]))}</div>'
     sample = ""
     if rendered.get("sample"):
         sample = html.escape(json.dumps(rendered["sample"], ensure_ascii=False))
-    threshold_text = (
-        f"Threshold: {html.escape(str(threshold.get('aggregation')))} "
-        f"{html.escape(str(threshold.get('operator')))} "
-        f"{html.escape(str(threshold.get('value')))} {html.escape(str(panel.get('unit')))}"
-    )
+    thr_class = "thr" if breached is not False else "thr ok"
     meta = (
         f'unit: {html.escape(str(panel.get("unit")))} | '
         f"events: {html.escape(', '.join(panel.get('events', [])))} | "
@@ -260,8 +324,9 @@ def render_panel_html(panel: dict[str, Any], events: list[dict[str, Any]]) -> st
         f"<h2>{html.escape(str(panel.get('id')))} &mdash; {html.escape(str(panel.get('title')))}</h2>"
         f'<div class="unit">{meta}</div>'
         f'<table class="stats">{rows}</table>'
-        f'<div class="thr">&#9888; {threshold_text}</div>'
+        f'<div class="{thr_class}">{html.escape(threshold_text)}</div>'
         + "".join(series)
+        + note
         + (f"<pre>{sample}</pre>" if sample else "")
         + "</div>"
     )
@@ -311,16 +376,15 @@ def render_text(
     ]
     for panel in panels:
         rendered = compute_panel(panel, events)
-        threshold = panel.get("threshold", {})
+        _, threshold_text = _threshold_state(panel, rendered.get("metrics", {}))
         lines.append("")
         lines.append(f"[{panel['id']}] {panel['title']}")
         lines.append(f"  unit={panel['unit']}  events={panel['events']}  fields={panel['fields']}")
         for label, value in rendered["stats"]:
             lines.append(f"  - {label}: {value}")
-        lines.append(
-            f"  ! threshold: {threshold.get('aggregation')} "
-            f"{threshold.get('operator')} {threshold.get('value')}"
-        )
+        lines.append(f"  {threshold_text}")
+        if rendered.get("note"):
+            lines.append(f"  i {rendered['note']}")
         for series_title, points in rendered["series"]:
             if points:
                 body = ", ".join(f"{name}={_fmt(value)}" for name, value in points[-8:])

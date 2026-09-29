@@ -1,0 +1,30 @@
+CP2 - TRACE METADATA (evidence 08)
+==============================================================================
+Trace ID: 3c529d95daf777e0ea1d217ad44fc008
+
+METADATA TAI ROOT SPAN (doc chung goi 'Prompts' / 'Metadata' tren Langfuse UI)
+------------------------------------------------------------------------------
+  correlation_id            = req-66f9c679
+  doc_count                 = 1
+  feature                   = monitoring
+  model                     = claude-sonnet-4-5
+  prompt_fetch_error        = 
+  prompt_label              = candidate
+  prompt_name               = day13-chat
+  prompt_source             = langfuse
+  prompt_version            = 2
+  query_preview             = Describe how to prove a slow span is the root cause.
+  ttft_ms                   = 50
+
+TOKEN VA COST TREN GENERATION OBSERVATION
+------------------------------------------------------------------------------
+  usage: input=43  output=81  total=124
+  cost : 0.001344 USD
+  model: claude-sonnet-4-5   |   ttft_ms: 50
+
+DOI CHIEU LOG <-> TRACE
+------------------------------------------------------------------------------
+  Log req-66f9c679 : tokens_in=43, tokens_out=81, cost_usd=0.001344, ttft_ms=50
+  Trace cung ID     : input=43,    output=81,    totalCost=0.001344, ttft_ms=50
+  => Khop khop. Va correlation_id=req-66f9c679 xuat hien trong metadata cua TAT CA
+     observation trong trace, nen log va trace luon noi duoc bang khoa nay.

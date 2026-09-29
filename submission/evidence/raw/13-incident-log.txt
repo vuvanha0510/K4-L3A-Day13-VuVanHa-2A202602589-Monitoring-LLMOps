@@ -1,0 +1,42 @@
+CP3 - INCIDENT LOG (evidence 13)
+==============================================================================
+Nguon          : data/logs.jsonl (cung nguon voi dashboard trong config/dashboard.yaml)
+Cau lenh loc   : event == 'response_sent' and latency_ms > 2000  (nguong trong challenge.json)
+Correlation ID : req-66f9c679  <- request bat thuong da chon de dieu tra
+
+1) CAC LOG LINE NGUYEN VEN CUA CUNG MOT CORRELATION ID
+------------------------------------------------------------------------------
+{"service": "api", "payload": {"message_preview": "Describe how to prove a slow span is the root cause."}, "event": "request_received", "feature": "monitoring", "correlation_id": "req-66f9c679", "user_id_hash": "ed72e61117f6", "session_id": "k4-l3a-challenge-s05", "env": "dev", "model": "gpt-4o-mini", "level": "info", "ts": "2026-09-29T13:57:29.743142Z"}
+{"service": "api", "latency_ms": 2655, "ttft_ms": 50, "tokens_in": 43, "tokens_out": 81, "cost_usd": 0.001344, "quality_score": 0.8, "tool_name": "retrieval", "tool_success": true, "payload": {"answer_preview": "Starter answer. You should improve this output logic and add better quality chec..."}, "event": "response_sent", "feature": "monitoring", "correlation_id": "req-66f9c679", "user_id_hash": "ed72e61117f6", "session_id": "k4-l3a-challenge-s05", "env": "dev", "model": "gpt-4o-mini", "level": "info", "ts": "2026-09-29T13:57:32.410708Z"}
+
+2) DOC GIAI TUNG TRUONG
+------------------------------------------------------------------------------
+  event          = response_sent
+  ts             = 2026-09-29T13:57:32.410708Z
+  feature        = monitoring   <- bang affected_feature cua challenge K4
+  session_id     = k4-l3a-challenge-s05   <- khop query chinh thuc thu 5 trong challenge.json
+  latency_ms     = 2655  > latency_threshold_ms=2000 va > SLO 3000
+  ttft_ms        = 50  -> BANG baseline, LLM van phan hoi binh thuong
+  tool_name      = retrieval  | tool_success = True  -> khong co loi tool
+  tokens_in/out  = 43/81  | cost_usd = 0.001344  | quality = 0.8
+  user_id_hash   = ed72e61117f6  (da hash, khong co PII tho)
+  user agent quan sat tu load_test.py: 13374.3 ms
+
+3) SO SANH VOI REQUEST BINH THUONG CUNG FEATURE (SAU KHI TAT INCIDENT)
+------------------------------------------------------------------------------
+  Cac dong duoi day lay tu data/logs.jsonl, sau thoi diem 13:58Z,
+  tuc la sau khi da chay: python scripts/inject_incident.py --disable
+  2026-09-29T14:00:30.078586Z  req-af416ce6  feature=monitoring  latency_ms=158  ttft_ms=55
+  2026-09-29T14:00:30.242248Z  req-f6dee6bb  feature=monitoring  latency_ms=152  ttft_ms=50
+  2026-09-29T14:00:30.402635Z  req-d047423b  feature=monitoring  latency_ms=151  ttft_ms=50
+  => Latency server cua cung feature monitoring tro ve ~151-158 ms, ttft_ms van = 50 ms.
+     (Con so 830 ms quan sat duoc o load_test.py la thoi gian phia client, bi anh huong
+     boi hang doi 5 request; con so server ghi trong log la ~151-158 ms.)
+     Chi latency thay doi; chat luong du lieu (tokens/quality) va LLM khong doi.
+     Dieu nay loai tru gia thuyet 'LLM cham' va 'retrieval loi/chua du du lieu'.
+
+4) CHUOI NOI LOG -> TRACE
+------------------------------------------------------------------------------
+  Log nay ghi correlation_id=req-66f9c679.
+  Cung gia tri do duoc gan vao trace metadata cua trace Langfuse
+  3c529d95daf777e0ea1d217ad44fc008 (xem evidence 14).

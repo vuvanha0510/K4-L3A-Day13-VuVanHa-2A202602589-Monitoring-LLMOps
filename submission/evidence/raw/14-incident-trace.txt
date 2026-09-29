@@ -1,0 +1,52 @@
+CP3 - INCIDENT TRACE (evidence 14)
+==============================================================================
+Nguon        : Langfuse project ca nhan day13-k4-l3a-2A202602589
+Trace ID     : 3c529d95daf777e0ea1d217ad44fc008
+Cau hoi     : truy van GET /api/public/v2/observations voi traceId=<ID>
+               (Langfuse SDK v4.15.6; GET /api/public/traces da go la legacy -> HTTP 410)
+Tu khop      : trace metadata.correlation_id = req-66f9c679  ==  log trong evidence 13
+               session_id = k4-l3a-challenge-s05  ==  query chinh thuc cua challenge K4
+Root span    : lab-agent-run | type=GENERATION | env=None
+
+1) WATERFALL (thoi gian tinh tu dau trace)
+------------------------------------------------------------------------------
+  span            type        parent                bat dau thoi luong   % tong
+  lab-agent-run   GENERATION  (root)                 0.000s     2.667s 100.0%
+  rag-retrieve    RETRIEVER   cbaa7a87a6b2140f       0.000s     2.514s  94.3%
+  llm-generate    GENERATION  cbaa7a87a6b2140f       2.514s     0.153s   5.7%
+
+2) DOC GIAI
+------------------------------------------------------------------------------
+  - lab-agent-run (root, GENERATION): 2.667 s
+  - rag-retrieve  (RETRIEVER)      : 2.514 s  <= 94.3% tong thoi gian request
+  - llm-generate  (GENERATION)     : 0.153 s  <= 5.7% tong thoi gian request
+
+  Span 'rag-retrieve' chiem 2.514 s trong khi span 'llm-generate' chi 0.153 s.
+  => Khong phai LLM cham ma la bo truy xuong (retrieval) cham.
+  => Day la dau hieu khop voi ttft_ms = 50 ms giong het baseline o log (evidence 13):
+     thoi gian bi ton truoc khi LLM bat dau sinh token.
+
+3) METADATA TAI ROOT SPAN
+------------------------------------------------------------------------------
+  correlation_id      = req-66f9c679
+  feature             = monitoring
+  model               = claude-sonnet-4-5
+  prompt_name         = day13-chat
+  prompt_version      = 2
+  prompt_label        = candidate
+  prompt_source       = langfuse
+  prompt_fetch_error  = 
+  doc_count           = 1
+  query_preview       = Describe how to prove a slow span is the root cause.
+  ttft_ms             = 50
+
+4) TOKEN VA COST (khop voi log)
+------------------------------------------------------------------------------
+  usage: input=43  output=81  total=124      (log: tokens_in=43, tokens_out=81)
+  cost : 0.001344 USD                         (log: cost_usd=0.001344)
+  prompt_source=langfuse, prompt_version=2, label=candidate  -> khong phai metadata gia
+
+5) KET LUAN
+------------------------------------------------------------------------------
+  Metric (P95 latency 2663 ms, TTFT P95 khong doi) + Log (req-66f9c679, latency_ms=2655,
+  ttft_ms=50) + Trace (span rag-retrieve 2.514 s / 94%) cung chi ve MOT nguyen nhan.

@@ -1,0 +1,23 @@
+CP2 - TRACE WATERFALL (evidence 07)
+==============================================================================
+Project  : day13-k4-l3a-2A202602589
+Trace ID : 3c529d95daf777e0ea1d217ad44fc008
+Session  : k4-l3a-challenge-s05   |   env: dev
+Cau truc: root lab-agent-run -> 2 child observation (retrieval + generation)
+
+WATERFALL (thoi gian tinh tu dau trace)
+------------------------------------------------------------------------------
+  span             type        parent                  bat dau  thoi luong  % root
+  ----------------------------------------------------------------------------
+  lab-agent-run    GENERATION  (root)                   0.000s      2.667s  100.0%
+  rag-retrieve     RETRIEVER   cbaa7a87a6b2140f         0.000s      2.514s   94.3%
+  llm-generate     GENERATION  cbaa7a87a6b2140f         2.514s      0.153s    5.7%
+
+DOC GIAI
+------------------------------------------------------------------------------
+  - lab-agent-run (root)      : 2.667 s  <- tong thoi gian request
+  - rag-retrieve (RETRIEVER)  : 2.514 s  <- con: truy xung ngu van cung RAG
+  - llm-generate  (GENERATION) : 0.153 s  <- con: goi LLM, co model + token + cost
+
+  Trace nay thuoc incident CP3 (rag_slow), nen RAG chiem 94.3% thoi gian.
+  O workload binh thuong, ti le nay trai ve ~6% (RAG) / ~94% (LLM).

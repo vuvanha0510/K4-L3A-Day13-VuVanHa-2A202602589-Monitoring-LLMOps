@@ -1,0 +1,5 @@
+﻿$ .venv/Scripts/python.exe -m pytest -q
+==============================================================================
+............................                                             [100%]
+28 passed in 4.36s
+Failed to export spans batch code: 401, reason: Unauthorized

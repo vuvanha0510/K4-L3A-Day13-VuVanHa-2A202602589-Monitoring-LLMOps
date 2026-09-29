@@ -1,0 +1,35 @@
+CP2 - PROMPT ROLLBACK (evidence 10)
+==============================================================================
+Muc tieu: chung minh doi LABEL production la du chuyen duoc prompt ma khong sua code,
+
+QUY TRINH DA CHAY
+------------------------------------------------------------------------------
+  1) Tao prompt:
+     $ python scripts/prompt_versions.py create
+       -> v1 labels [baseline, production]   (prompt nen)
+       -> v2 labels [candidate]              (rut gon, yeu cau tra loi ngan)
+
+  2) Promote: chuyen label production sang version 2
+     $ python scripts/prompt_versions.py promote --version 2
+       -> Da chuyen label production sang version 2
+     Luc nay moi request se ghi prompt_version=2, prompt_label=production.
+
+  3) Rollback: dua label production ve version 1
+     $ python scripts/prompt_versions.py rollback --version 1
+       -> Da rollback label production ve version 1
+     Moi request tro lai ghi prompt_version=1, prompt_label=production.
+
+  4) Xac nhan trang thai cuoi cung
+------------------------------------------------------------------------------
+production: version 1
+  baseline: version 1
+ candidate: version 2
+
+  => production dang tro ve version 1, candidate giu version 2.
+  => Khong sua code, khong build, khong deploy lai chi can doi label.
+
+  5) TAI SAO CO Y NGHA VA VAN HANH
+------------------------------------------------------------------------------
+  Neu version 2 gay chat luong xau hoac do tre tang (do it cau), thi thao tac
+  rollback dua production ve version 1 chay ngay. Do la ly do prompt phai duoc
+  luu trong Langfuse chu khong hard-code trong code: doi chung chi ton tai o dang label.

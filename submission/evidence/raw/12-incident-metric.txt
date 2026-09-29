@@ -1,0 +1,37 @@
+CP3 - INCIDENT METRIC (evidence 12)
+==============================================================================
+Challenge ID      : day13-k4-l3a-monitoring-llmops-v1 (cohort K4)
+Challenge incident: rag_slow | affected_feature=monitoring | latency_threshold_ms=2000
+Dashboard source  : data/logs.jsonl (config/dashboard.yaml, 6/6 panel, time range 60 phut)
+
+1) TRIEU CHUNG tren dashboard / metrics
+------------------------------------------------------------------------------
+  Panel [latency]  P95 latency tang tu 673 ms (baseline) len 2663 ms -> vuot nguong SLO 3000 ms
+  Panel [latency]  bieu do theo phut: 13:56 = 2061 ms  ->  13:57 = 13287 ms
+  Panel [latency]  TTFT P95 = 50 ms  -> KHONG DOI so voi baseline (50 ms)
+  Panel [errors]   error rate 0.0 %, retrieval success 100 % -> KHONG phai loi hay mat context
+  Panel [cost]/[tokens]/[quality] khong doi: cost/request 0.0019 USD, quality 0.8-0.9
+  Endpoint GET /metrics luc Luc trong chuoi su co:
+    latency_p50=155.0  latency_p95=2663.0  latency_p99=2663.0  ttft_p95=50.0
+    error_breakdown={}  quality_avg=0.8667
+
+  => Doc: latency tang manh nhung TTFT P95 di ngang. TTFT do thoi diem san xuat
+     token dau tien, nen thoi gian bi ton THAT o buoc truoc do (retrieval),
+     khong phai o buoc sinh token cua LLM.
+
+2) KHOANG THOI GIAN su co (Asia/Ho_Chi_Minh, tuong ung log ts UTC)
+------------------------------------------------------------------------------
+  2026-09-29T13:57:27.074673Z  (20:57:27)  req-b785f965  feature=monitoring  latency_ms=2663  ttft_ms=50
+  2026-09-29T13:57:29.743142Z  (20:57:29)  req-9b8fbc93  feature=monitoring  latency_ms=2656  ttft_ms=50
+  2026-09-29T13:57:32.410708Z  (20:57:32)  req-66f9c679  feature=monitoring  latency_ms=2655  ttft_ms=50
+  2026-09-29T13:57:35.081121Z  (20:57:35)  req-5f626194  feature=monitoring  latency_ms=2658  ttft_ms=50
+  2026-09-29T13:57:37.755526Z  (20:57:37)  req-cc458be7  feature=monitoring  latency_ms=2655  ttft_ms=50
+  => Toan bo 5 request cua challenge deu nam trong khoang 2026-09-29T13:57:27.074673Z .. 2026-09-29T13:57:37.755526Z (1 phut).
+
+3) SO SANH VOI BASELINE (truoc khi bat incident)
+------------------------------------------------------------------------------
+  Baseline P50=154 ms  P95=673 ms  P99=673 ms  TTFT P95=50 ms  retrieval success=100%
+  Su co    P50=155 ms  P95=2663 ms P99=2663 ms TTFT P95=50 ms  retrieval success=100%
+  Client quan sat (load_test): 500-837 ms (truoc) vs 13370-13376 ms (khi su co)
+  Server latency trong log    : ~151-158 ms (truoc) vs 2655-2663 ms (khi su co)
+  => Dung nguong trong challenge.json (2000 ms) va nguong SLO (3000 ms) deu bi cham.

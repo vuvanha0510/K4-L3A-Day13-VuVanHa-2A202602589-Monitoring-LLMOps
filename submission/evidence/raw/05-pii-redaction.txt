@@ -1,0 +1,35 @@
+CP1 - PII REDACTION (evidence 05)
+==============================================================================
+Nguon: chay that app/pii.py + kiem tra data/logs.jsonl sau khi da scrub.
+
+1) CAC RULE TRONG app/pii.py
+------------------------------------------------------------------------------
+  email       : [\w\.-]+@[\w\.-]+\.\w+
+  phone_vn    : (\+84|0)([ .-]?\d){9}
+  cccd        : \b\d{12}\b
+  credit_card : \b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b
+  passport    : \b[A-Z]\d{7,8}\b
+  address_vn  : so/duong/phuong/xa/quan/huyen/thi xa/thanh pho/tinh
+
+2) KET QUA SCRUB TREN DU LIEU MAU
+------------------------------------------------------------------------------
+  Input  : email an.nguyen@gmail.com | SD 0912345678 | CCCD 001202012345
+           the 4242 4242 4242 4242
+  Output : [REDACTED_EMAIL] | SD [REDACTED_PHONE_VN] | CCCD [REDACTED_CCCD]
+           the [REDACTED_CREDIT_CARD]
+
+  user_id_hash = SHA-256(user_id)[:12]  ->  user_id KHONG BAO GI duoc ghi tho.
+
+3) KIEM CHUNG TRONG data/logs.jsonl THAT
+------------------------------------------------------------------------------
+  So lan xuat hien PII tho trong toan bo file log: 0  (validate_logs.py: 'Potential PII leaks detected: 0')
+  Da kiem tra email, dien thoai VN, CCCD va the thanh toan: 0 ket qua.
+
+4) THU TU REDACTION TRONG app/logging_config.py
+------------------------------------------------------------------------------
+  structlog.configure(processors=[merge_contextvars, add_log_level, TimeStamper,
+      scrub_event,          <-- PII processor O TRUOC
+      StackInfoRenderer, format_exc_info,
+      JsonlFileProcessor,   <-- ghi file data/logs.jsonl
+      JSONRenderer])        <-- render JSON ra console
+  => du lieu da duoc scrub TRUOC khi serialize/ghi xuong file, khong phu thuoc handler nao.

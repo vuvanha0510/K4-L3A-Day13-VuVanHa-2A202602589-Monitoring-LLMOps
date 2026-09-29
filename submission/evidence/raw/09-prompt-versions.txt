@@ -1,0 +1,50 @@
+CP2 - PROMPT VERSIONS (evidence 09)
+==============================================================================
+Project Langfuse ca nhan : day13-k4-l3a-2A202602589
+Prompt name             : day13-chat (type=text)
+Tao bang                : python scripts/prompt_versions.py create
+
+1) HAI VERSION TRONG PROJECT
+------------------------------------------------------------------------------
+  version 1  labels: baseline, production
+    Feature={{feature}}
+    Docs={{docs}}
+    Question={{message}}
+    Answer briefly and cite the docs.
+
+  version 2  labels: candidate
+    You are a concise support assistant.
+    Feature={{feature}}
+    Docs={{docs}}
+    Question={{message}}
+    Answer in at most three sentences and only use the docs above.
+
+  Ca hai version giu dung ba bien {{feature}} {{docs}} {{message}} theo docs/PROMPT_VERSIONING.md
+
+2) TRUY VAN LABEL HIEN TAI TREN LANGFUSE
+------------------------------------------------------------------------------
+production: version 1
+  baseline: version 1
+ candidate: version 2
+
+3) HAI TRACE CHUNG MINH HAI VERSION KHAC NHAU
+------------------------------------------------------------------------------
+  v1 / baseline :
+    2f79b4c2c993bc5b541af1b59d949cfa  (session k4-l3a-challenge-s04)
+    e1ea045d09dc6b471705e18791f8bd50  (session k4-l3a-challenge-s01)
+    418e0880ab910357e8797795a1ff34a9  (session k4-l3a-challenge-s05)
+
+  v2 / candidate :
+    164e96a3aa522592d5f122be0d02e626  (session-01)
+    5781d0d000ae0d13667e78506acf1dd2  (session s01)
+    74b1658b539c13a3c15c27ab536195cc  (session s03)
+
+  Mo moi trace tren Langfuse se thay trong metadata:
+    prompt_name=day13-chat | prompt_version=1|2 | prompt_label=baseline|candidate
+    prompt_source=langfuse   (khong phai 'local-fallback' -> prompt lay that tu Langfuse)
+
+4) CUNG MOT BO INPUT, HAI LABEL
+------------------------------------------------------------------------------
+  - data/sample_queries.jsonl voi LANGFUSE_PROMPT_LABEL=baseline
+  - data/sample_queries.jsonl voi LANGFUSE_PROMPT_LABEL=candidate
+  - bo query thu thuc cua challenge voi ca hai label

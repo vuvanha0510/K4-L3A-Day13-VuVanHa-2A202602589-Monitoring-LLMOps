@@ -1,0 +1,48 @@
+CP2 - TRACE LIST (evidence 06)
+==============================================================================
+Project Langfuse ca nhan : day13-k4-l3a-2A202602589
+API truy van             : GET /api/public/v2/observations?fromStartTime=..&toStartTime=..
+  (GET /api/public/traces da go legacy -> HTTP 410 cho org tao sau 16/09/2026)
+Tong trace lab-agent-run  : 30 (trong 48h) - deu do chay tu may hoc vien
+
+DANH SACH TRACE
+------------------------------------------------------------------------------
+  trace_id                          gio (VN)  session                   prompt            
+  2559ebaa3a3d35853004500e193634ee  17:15:55   s09                       (khong co metadata)
+  002ab493a93f267e237c2e804c4d85f9  17:15:56   s10                       (khong co metadata)
+  294e4fd39e9159ec21f2a80e93ad7614  17:29:29   session-01                (khong co metadata)
+  63322b52530d86bdb686e8e0efecd6c4  17:29:52   session-01                (khong co metadata)
+  164e96a3aa522592d5f122be0d02e626  17:39:06   session-01                v2/candidate      
+  5781d0d000ae0d13667e78506acf1dd2  20:56:53   s01                       v2/candidate      
+  74b1658b539c13a3c15c27ab536195cc  20:56:53   s03                       v2/candidate      
+  b997aaad2fb4bfd580eef8997675f1d8  20:56:54   s04                       v2/candidate      
+  02c4b82b6b662882003c346f55c605fa  20:56:54   s02                       v2/candidate      
+  d15f1aedabe8aea416f72fe26c50f069  20:56:54   s05                       v2/candidate      
+  93f20c08c33b0254274f8fdbeab37611  20:56:54   s06                       v2/candidate      
+  24c415f6842c2633d804c3ad72d155b7  20:56:54   s07                       v2/candidate      
+  d77648e30aa9e45472d80fc16a023ac6  20:56:54   s08                       v2/candidate      
+  a18ac50658da124793dfbc2447b86ed7  20:56:55   s09                       v2/candidate      
+  b040343f29510224d45a15a1e717d4d9  20:56:55   s10                       v2/candidate      
+  923d69677964c3f6ac8a88ac63b92795  20:57:24   k4-l3a-challenge-s04      v2/candidate      
+  4d00a28e6728111172de17cae67cb3f7  20:57:27   k4-l3a-challenge-s02      v2/candidate      
+  3c529d95daf777e0ea1d217ad44fc008  20:57:29   k4-l3a-challenge-s05      v2/candidate      
+  8d451dc035203d3bad72283ba5c840be  20:57:32   k4-l3a-challenge-s01      v2/candidate      
+  f8919f4c47d016816df08d7e9f2664fc  20:57:35   k4-l3a-challenge-s03      v2/candidate      
+  af4733b8001ba491e422c5967652decf  21:00:29   k4-l3a-challenge-s03      v2/candidate      
+  4f10acaa17d03d88bf4d5d0644736f74  21:00:30   k4-l3a-challenge-s05      v2/candidate      
+  65149ef0fbe473bae2203511d04c58b2  21:00:30   k4-l3a-challenge-s02      v2/candidate      
+  b2285a331a13557e472244967188ac01  21:00:30   k4-l3a-challenge-s04      v2/candidate      
+  5485acb9f0e2e42661cb1640e84358e3  21:00:30   k4-l3a-challenge-s01      v2/candidate      
+  2f79b4c2c993bc5b541af1b59d949cfa  21:13:40   k4-l3a-challenge-s04      v1/baseline       
+  e1ea045d09dc6b471705e18791f8bd50  21:13:41   k4-l3a-challenge-s01      v1/baseline       
+  418e0880ab910357e8797795a1ff34a9  21:13:41   k4-l3a-challenge-s05      v1/baseline       
+  5deb3ab97ff6c3f6148c2019777c3bb6  21:13:41   k4-l3a-challenge-s03      v1/baseline       
+  ee97d844aa8ab2c3897be6ea512f332f  21:13:41   k4-l3a-challenge-s02      v1/baseline       
+
+TONG HOP THEO PROMPT VERSION
+------------------------------------------------------------------------------
+  version=1: 5 trace
+  version=2: 21 trace
+  version=None: 4 trace
+
+=> >= 10 trace tu tao trong project ca nhan: DA DAT (khong dung trace cua nguoi khac).
