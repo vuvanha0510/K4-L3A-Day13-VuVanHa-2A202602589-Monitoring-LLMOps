@@ -1,25 +1,63 @@
+# Ba alert symptom-based của CP2.
+# Mỗi alert bám vào triệu chứng người dùng quan sát được (chậm / lỗi / sai
+# câu trả lời), không bám vào tên bên trong implementation. Query đọc trực
+# tiếp từ data/logs.jsonl - cùng nguồn dữ liệu với dashboard.
+# Anchors #alert-1/2/3 trỏ tới docs/alerts.md.
+
 alerts:
-  - name: TODO_alert_1
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: high_p95_latency
+    severity: critical
+    symptom: Người dùng chờ quá lâu (>3s) cho câu trả lời
+    source: data/logs.jsonl
+    panel: latency
+    condition: 'percentile(latency_ms, 95) of event == "response_sent" > 3000'
+    duration: 5m
+    for_consecutive_windows: 3
     type: symptom-based
+    slo: fast_successful_requests
     channel: slack
-    owner: TODO
+    slack_channel: "#k4-l3a-alerts-latency"
+    owner: Vũ Văn Hà (2A202602589)
     runbook: docs/alerts.md#alert-1
-  - name: TODO_alert_2
-    severity: TODO
-    condition: TODO
-    duration: TODO
+    baseline_reference: "P95 baseline = 1202ms; ngưỡng 3000ms xuất phát từ baseline này"
+    mitigation: >-
+      Bật/tắt scenario RAG chậm, giảm số doc đưa vào prompt, hoặc rollback
+      prompt về version ngắn hơn nếu độ trễ do prompt dài.
+
+  - name: elevated_error_rate
+    severity: critical
+    symptom: Tỷ lệ request thất bại tăng vượt 2%
+    source: data/logs.jsonl
+    panel: errors
+    condition: 'count(event == "request_failed") / count(event == "request_received") * 100 > 2'
+    duration: 3m
+    for_consecutive_windows: 2
     type: symptom-based
+    slo: fast_successful_requests
     channel: slack
-    owner: TODO
+    slack_channel: "#k4-l3a-alerts-errors"
+    owner: Vũ Văn Hà (2A202602589)
     runbook: docs/alerts.md#alert-2
-  - name: TODO_alert_3
-    severity: TODO
-    condition: TODO
-    duration: TODO
+    baseline_reference: "Error rate baseline = 9.09% do bug update_current_observation đã sửa; sau khi sửa kỳ vọng < 2%"
+    mitigation: >-
+      Lọc request_failed theo error_type, kiểm tra trace cùng correlation_id;
+      rollback deploy gần nhất nếu lỗi do code.
+
+  - name: retrieval_success_drop
+    severity: warning
+    symptom: Tỷ lệ retrieval thất bại khiến câu trả lời sai ngữ cảnh
+    source: data/logs.jsonl
+    panel: errors
+    condition: 'count(tool_success == true) / count(tool_success != null) * 100 < 90'
+    duration: 5m
+    for_consecutive_windows: 3
     type: symptom-based
+    slo: fast_successful_requests
     channel: slack
-    owner: TODO
+    slack_channel: "#k4-l3a-alerts-rag"
+    owner: Vũ Văn Hà (2A202602589)
     runbook: docs/alerts.md#alert-3
+    baseline_reference: "Retrieval success baseline = 100%"
+    mitigation: >-
+      Kiểm tra vector store, tắt feature đang lỗi qua incident switch và
+      rollback prompt nếu prompt version mới làm hỏng retrieval.

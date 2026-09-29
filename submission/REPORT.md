@@ -4,13 +4,13 @@
 
 ## 1. Thông tin học viên
 
-- **Họ và tên:**
-- **MSSV:**
+- **Họ và tên:** Vũ Văn Hà
+- **MSSV:** 2A202602589
 - **Lớp:** K4-L3A
-- **Repository URL:**
+- **Repository URL:**https://github.com/vuvanha0510/K4-L3A-Day13-VuVanHa-2A202602589-Monitoring-LLMOps.git
 - **Commit SHA cuối:**
 - **Challenge ID:**
-- **Tên project Langfuse cá nhân:** `day13-k4-l3a-<MSSV>`
+- **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602589`
 
 ## 2. Evidence index
 

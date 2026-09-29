@@ -9,7 +9,15 @@ from .mock_llm import FakeLLM
 from .mock_rag import retrieve
 from .pii import hash_user_id, summarize_text
 from .prompt_management import resolve_prompt
-from .tracing import get_langfuse_client, observe, propagate_attributes, tracing_enabled
+from .tracing import (
+    get_langfuse_client,
+    mark_error,
+    observe,
+    propagate_attributes,
+    tracing_enabled,
+    update_generation,
+    update_span,
+)
 
 
 @dataclass
@@ -24,6 +32,11 @@ class AgentResult:
 
 
 class LabAgent:
+    # Đơn giá tham chiếu (USD / 1M token) dùng cho cả log lẫn trace để
+    # dashboard và Langfuse không lệch số cost với nhau.
+    INPUT_COST_PER_MTOK = 3.0
+    OUTPUT_COST_PER_MTOK = 15.0
+
     def __init__(self, model: str = "claude-sonnet-4-5") -> None:
         self.model = model
         self.llm = FakeLLM(model=model)
@@ -51,7 +64,34 @@ class LabAgent:
             },
         ):
             started = time.perf_counter()
-            docs = retrieve(message)
+
+            # 1. Instrument retrieve() dưới dạng Child Span (retriever).
+            # capture_input/output=False để không đẩy raw query (có thể chứa PII)
+            # lên Langfuse; chỉ ghi preview đã scrub.
+            @observe(
+                name="rag-retrieve",
+                as_type="retriever",
+                capture_input=False,
+                capture_output=False,
+            )
+            def _instrumented_retrieve(query: str):
+                try:
+                    return retrieve(query)
+                except Exception as exc:
+                    mark_error(langfuse_client, message=f"retrieval failed: {type(exc).__name__}")
+                    raise
+
+            docs = _instrumented_retrieve(message)
+            query_preview = summarize_text(message)
+            update_span(
+                langfuse_client,
+                metadata={
+                    "doc_count": len(docs),
+                    "query_preview": query_preview,
+                },
+            )
+
+            # Resolve Prompt từ Langfuse
             prompt = resolve_prompt(
                 langfuse_client,
                 feature=feature,
@@ -59,26 +99,84 @@ class LabAgent:
                 message=message,
                 enabled=tracing_enabled(),
             )
-            langfuse_client.update_current_span(
+
+            # 2. Instrument FakeLLM.generate() dưới dạng Child Generation Observation.
+            # Generation phải có model + usage + cost để dashboard tính được cost/token.
+            @observe(
+                name="llm-generate",
+                as_type="generation",
+                capture_input=False,
+                capture_output=False,
+            )
+            def _instrumented_generate(prompt_text: str):
+                try:
+                    return self.llm.generate(prompt_text)
+                except Exception as exc:
+                    mark_error(
+                        langfuse_client,
+                        message=f"llm failed: {type(exc).__name__}",
+                        generation=True,
+                    )
+                    raise
+
+            with propagate_attributes(prompt=prompt.managed_prompt):
+                response = _instrumented_generate(prompt.text)
+                # cost tính ngay từ usage để gắn vào generation observation;
+                # Langfuse dùng cost_details này để tổng hợp cost theo trace.
+                generation_cost = self._estimate_cost(
+                    response.usage.input_tokens, response.usage.output_tokens
+                )
+                update_generation(
+                    langfuse_client,
+                    model=response.model,
+                    usage_details={
+                        "input": response.usage.input_tokens,
+                        "output": response.usage.output_tokens,
+                        "total": response.usage.input_tokens + response.usage.output_tokens,
+                    },
+                    cost_details={
+                        "input": round(
+                            (response.usage.input_tokens / 1_000_000) * self.INPUT_COST_PER_MTOK,
+                            8,
+                        ),
+                        "output": round(
+                            (response.usage.output_tokens / 1_000_000) * self.OUTPUT_COST_PER_MTOK,
+                            8,
+                        ),
+                        "total": generation_cost,
+                    },
+                    metadata={
+                        "ttft_ms": response.ttft_ms,
+                        "prompt_name": prompt.name,
+                        "prompt_label": prompt.label,
+                        "prompt_version": prompt.version,
+                        "prompt_source": prompt.source,
+                    },
+                )
+
+            # Tính toán chất lượng, thời gian đáp ứng và chi phí
+            quality_score = self._heuristic_quality(message, response.text, docs)
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            cost_usd = generation_cost
+
+            # 3. Gắn prompt version lên root span. Token/cost đã nằm ở
+            # generation observation (đúng chỗ Langfuse dùng để tính cost),
+            # root span chỉ giữ thông tin định danh để nối trace với log.
+            update_span(
+                langfuse_client,
+                version=prompt.version,
                 metadata={
                     "doc_count": len(docs),
-                    "query_preview": summarize_text(message),
+                    "query_preview": query_preview,
                     "prompt_name": prompt.name,
                     "prompt_label": prompt.label,
                     "prompt_version": prompt.version,
                     "prompt_source": prompt.source,
                     "prompt_fetch_error": prompt.fetch_error or "",
                 },
-                version=prompt.version,
             )
-            # TODO (CP2): instrument retrieve() and FakeLLM.generate() as child
-            # observations. The nested generation must receive prompt, usage and cost.
-            with propagate_attributes(prompt=prompt.managed_prompt):
-                response = self.llm.generate(prompt.text)
-            quality_score = self._heuristic_quality(message, response.text, docs)
-            latency_ms = int((time.perf_counter() - started) * 1000)
-            cost_usd = self._estimate_cost(response.usage.input_tokens, response.usage.output_tokens)
 
+        # Ghi nhận Prometheus/Metrics
         metrics.record_request(
             latency_ms=latency_ms,
             ttft_ms=response.ttft_ms,
@@ -99,8 +197,8 @@ class LabAgent:
         )
 
     def _estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
-        input_cost = (tokens_in / 1_000_000) * 3
-        output_cost = (tokens_out / 1_000_000) * 15
+        input_cost = (tokens_in / 1_000_000) * self.INPUT_COST_PER_MTOK
+        output_cost = (tokens_out / 1_000_000) * self.OUTPUT_COST_PER_MTOK
         return round(input_cost + output_cost, 6)
 
     def _heuristic_quality(self, question: str, answer: str, docs: list[str]) -> float:
